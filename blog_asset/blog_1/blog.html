@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<link rel="icon" href="../../favicon.png" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Control Flow Flattening Deobfuscate</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    background:black;
+    color:white;
+    font-family: monospace;
+    line-height:1.6;
+}
+
+/* TITLE */
+
+.title-wrapper{
+    width:100%;
+    display:flex;
+    justify-content:center;
+    z-index:1000;
+}
+
+.title{
+    font-size:42px;
+    font-weight:bold;
+    padding-top:50px;
+    text-align:center;
+
+    background:linear-gradient(to right,#00e1ff,#ff62d0);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+}
+
+/* CONTENT */
+
+main{
+    max-width:900px;
+    margin:auto;
+    padding:110px 20px 60px;
+}
+
+h1,h2,h3{
+    margin-top:40px;
+    margin-bottom:10px;
+}
+
+p{
+    margin-bottom:18px;
+    opacity:0.9;
+}
+
+ul{
+    margin-left:20px;
+    margin-bottom:18px;
+}
+
+code{
+    background:#111;
+    padding:2px 6px;
+    border-radius:4px;
+    color:#00e1ff;
+}
+
+pre{
+    background:#0b0b0b;
+    padding:16px;
+    border-radius:8px;
+    overflow:auto;
+    margin-bottom:24px;
+}
+
+/* IMAGE */
+
+.hero-img{
+    width:100%;
+    height:400px;
+    object-fit:cover;
+    border-radius:12px;
+    margin-bottom:40px;
+}
+
+.image-container{
+    width:100%;
+    margin-bottom:20px;
+}
+
+.image-container img{
+    width:100%;
+    height:400px;
+    object-fit:cover;
+    border-radius:12px;
+    display:block;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="title-wrapper">
+<pre class="title">Nghịch ngợm deobfuscate CFF</pre>
+</div>
+
+<main>
+
+<img class="hero-img" src="cff.jpg" alt="CFF banner">
+<p>
+    Đối với anh em Reverse thì CFF không còn quá xa lạ rồi. CFF gặp không chỉ trong CTF, mà malware dùng cũng rất nhiều.
+</p>
+<p>
+    Đây là 1 kiểu flow obfuscate theo mình đánh giá thì rất khó chịu, không những khó chịu khi mình debug mà còn làm khó cả những tool deobfuscate CFF. Những hrtng, d810 deobfuscate CFF bằng ida  microcode có thể rất ok ở những mẫu obfus CFF đơn giản, tuy nhiên với các dạng CFF có nhiều variant hơn thì rất dễ ngọng – bởi các block microcode hoạt động theo dạng double linked list:
+</p>
+<img class="image-container" src="1.jpg" alt="CFF1">
+<p>
+    Trong quá trình deobfuscate CFF, các block này sẽ được xử lý bằng cách sửa các link về đúng block của flow, tuy nhiên có thể các tool deob không build đúng link cho các block, giả sử như block1 và block2 không double linked với nhau, khi này sẽ dẫn đến internal error của IDA. 
+</p>
+<p>
+    Ngoài ra, chính việc không hiểu được các pattern của các biến thể, khiến cho các tool này không thể deob chính xác được. Từ đó mình nghĩ rằng nên tự custom deob lại, cũng là để hiểu sâu hơn về CFF. Mình cũng từng deob thử bằng microcode, tuy nhiên các block sẽ được xử lý qua nhiều maturity level để tiến gần hơn với mã giả mà chúng ta thấy:
+</p>
+<img class="image-container" src="2.jpg" alt="CFF2">
+<p>
+    Nên các block ở dạng assembly ban đầu có thể không match với các block ở các maturity level sau. Thêm nữa là vì không có graph nên khi gặp error khi double linked list sai, mình cũng rất khó để theo dõi. Thế nên khi mới tiếp cận, mình khá là mất thời gian trong việc match block để có thể deobfuscate đúng.
+</p>
+<p>
+    1 thời gian sau, khi rảnh rang lại, mình quay lại với CFF vì cảm thấy trước đây deob chưa đâu vào đâu. Và lần này, thay vì microcode chỉ để xem mã giả deob, sao ta không xiên thẳng raw assembly luôn nhỉ, mình đã nghĩ vậy và thực hiện luôn :D
+</p>
+
+<h2>Sample 1 — PlugX Variant</h2>
+
+<p>
+    Mẫu đầu tiên mà mình sử dụng để deob CFF ở đây là 1 biến thể PlugX.
+</p>
+
+<pre><code>libcef.dll - 1c08a922c3cc4cd2733f09785d10be98</code></pre>
+
+<p>
+    Mẫu này chỉ bị CFF 3 hàm đầu tiên, cũng là main work của malware:
+</p>
+<img class="image-container" src="3.jpg" alt="CFF3">
+<p>
+    Hàm export cef_api_hash với 0x10017655 thì tương đối dễ nhìn, chúng ta sẽ đi vào deob 2 hàm này trước:
+</p>
+<img class="image-container" src="4.jpg" alt="CFF4">
+<img class="image-container" src="5.jpg" alt="CFF5">
+<h2>1. CFF Base</h2>
+<p>
+    Như ta đã biết, CFF flat flow ra thành các block cùng cấp. Flow CFF qua từng flattened block sẽ được switch thông qua 1 block gọi là <code>Dispatcher</code>. 
+    Nhìn hình sau có thể thấy, block Dispatcher này có nhiều block trỏ về nó nhất:
+</p>
+<img class="image-container" src="6.jpg" alt="CFF6">
+<p>
+    Từ block Dispatcher này, ta có thông tin là EAX là dispatch register.
+    Trong quá trình quan sát, ta cũng để ý thấy có các block mov imm32 vào dispatch register kiểu như này: 
+</p>
+<img class="image-container" src="7.jpg" alt="CFF7">
+<p>
+    Và các block compare imm32 với dispatch register:
+</p>
+<img class="image-container" src="8.jpg" alt="CFF8">
+
+<p>
+    Thì ý tưởng của mình là sẽ nối thẳng block nào mov eax, imm32 với cmp imm32, eax tương ứng. Ví dụ 2 block sau sẽ được nối liền vào nhau:
+</p>
+<img class="image-container" src="9.jpg" alt="CFF9">
+<img class="image-container" src="10.jpg" alt="CFF10">
+
+<p>
+Tuy nhiên vẫn chưa là đủ, bởi các block cmp vẫn chia ra 2 nhánh theo jnz và jz mà đúng không :>. Nhưng thông qua quá trình debug, mình để ý các “block thật sự” của luồng chương trình chính luôn nằm ở nhánh False của jnz và nhánh True của jz. Ở đây mình sẽ highlight lên cho mọi người dễ nhìn: 
+</p>
+
+<img class="image-container" src="11.jpg" alt="CFF11">
+<img class="image-container" src="12.jpg" alt="CFF12">
+<p>
+    Từ đây, mình có 1 chain deobfuscate như sau:
+</p>
+<img class="image-container" src="13.jpg" alt="CFF13">
+<p>
+    Trong nhiều mẫu CFF mình gặp, đều tuân theo quy tắc này, đây có thể coi như trái tim của CFF. 
+</p>
+<h2>2. Variant Patterns</h2>
+
+<h3>2.1. Variant CMOVZ</h3>
+<p>
+    Tại hàm 0x10017655, mình cũng phát hiện được thêm 1 variant sử dụng CMOVZ:
+</p>
+<img class="image-container" src="14.jpg" alt="CFF14">
+<p>
+    CMOVZ sẽ được sử dụng như 1 switch để khiến block này đi theo 2 nhánh khác nhau.
+    Với 2 giá trị của dispatch reg và temp reg là 0xCE56232 và 0x808D22D6 (tạm gọi là main imm32 và sub imm32), qua việc debug bằng list các block cmp match với 2 giá trị này, mình nhận thấy:
+</p>
+<ul>
+<li>Sub imm32 sẽ khiến chương trình luôn nhảy về block match imm32 gần nhất.</li>
+<li>Main imm32 cũng tương tự, luôn khiến chương trình về block match imm32 có địa chỉ gần nhất.</li>
+</ul>
+<p>
+    Từ đó mình có flow xử lý variant này như sau:
+</p>
+<img class="image-container" src="15.jpg" alt="CFF15">
+<p>
+    Ta có output khá clean, là 1 hàm resolve API qua GetProcAddress với Module loop từ PEB:
+</p>
+<img class="image-container" src="16.jpg" alt="CFF16">
+<h3>2.2. Variant CMOVB</h3>
+<p>
+    Như 2 hàm mình đã đề cập bên trên, nó khá là dễ theo dõi và graph cũng khá nhỏ để theo dõi cũng như hiểu mà deob. Nhưng ác mộng của mình quay trở lại khi tới với hàm 0x10001040, trước hết là nó quá to để có thể tìm được hết variant ☹:
+</p>
+<img class="image-container" src="17.jpg" alt="CFF17">
+<p>
+    Thứ 2 là không đơn thuần chỉ sử dụng 1 dispatch register nữa, hàm này sử dụng thêm các nested dispath register khác như ecx, edx, esi, edi:
+</p>
+<img class="image-container" src="18.jpg" alt="CFF18">
+<p>
+    Điều này gây khó cho mình khi tìm toàn bộ các dispatch reg, bởi, các hàm đơn giản chỉ có 1 block là được trỏ nhiều nhất (chắc chắn là dispatcher). Vậy nếu có nhiều block cũng được trỏ nhiều như thế thì phải làm sao?
+</p>
+<p>
+    Mình đi đến ý tưởng loại bỏ các block chỉ có predset count là 0, 1,2 (bởi vì các block này rất phổ thông phải không, chương trình nào cũng có). Và những block còn lại, nếu predset count của nó xuất hiện quá ít so với các block khác trong chương trình (cái này khá false positive, mình chưa tìm ra thuật toán nào hợp lý :v), mình sẽ nhận định đây chính là dispatcher và nested dispatcher. Và từ đó mình tìm ra dispatch reg như sau:
+</p>
+<img class="image-container" src="19.jpg" alt="CFF19">
+<p>
+    Thì ý tưởng cũng khá là dễ thôi, nested dispatcher nghe thì hầm hố nhưng thực ra thực hiện loop deob với từng dispatch khác nhau là được mà 😊.
+</p>
+<p>
+    Sau khi đã xác định được dispatchers và deob theo các bước đã làm với 2 hàm kia, mình nhận ra tại đây có 1 variant nữa là CMOVB. Đây là variant tốn thời gian nhất của mình vì debug và đoán pattern hoạt động tương đối khó. Ở đây, ta theo dõi 1 block của variant này:
+</p>
+<img class="image-container" src="20.jpg" alt="CFF20">
+<p>
+    Giống với CMOVZ, dễ thấy nó cũng sử dụng 2 imm32 để switch flow. Tuy nhiên, khác với CMOVZ, tìm block đích không còn dùng kiểu tìm block có địa chỉ gần nhất được nữa ☹. Mà thông qua debug, mình để ý 1 imm32 thì vẫn tuân theo quy tắc địa chỉ gần nhất, nhưng imm32 còn lại sẽ match theo pair index. Kiểu như thế này:
+</p>
+<img class="image-container" src="21.jpg" alt="CFF21">
+<p>
+    Idea khá rõ ràng rồi đúng không, tương tự như CMOVZ, ta sẽ patch JB vào variant CMOVB này:
+</p>
+<img class="image-container" src="22.jpg" alt="CFF22">
+<p>
+    Ngoài 2 variant chủ đạo này, còn 1 variant nữa, nhưng nó tương tự pattern MOV, IMM32;JMP nhưng không có JMP thôi, mình sẽ không đề cập ở đây.
+</p>
+<p>
+    Sau khi tổng hợp lại các pattern, thực hiện deob và đây là kết quả sau khi deob của chúng ta:
+</p>
+<img class="image-container" src="23.jpg" alt="CFF23">
+<p>
+    Flow về cơ bản là cũng retrieve gần hết rồi. Vì bài này mình chỉ đi vào nghiên cứu deob CFF thôi nên sẽ bỏ qua các string obfuscate bằng MBA khác. Ví dụ như trên hình, mswpft~Q là encrypted string từ API sau:
+</p>
+<img class="image-container" src="24.jpg" alt="CFF24">
+<p>
+    Tuy nhiên cũng bởi obfus MBA quá bẩn, mình không rõ mình deob 100% không? Vậy nên tiếp theo mình sẽ tự xiên 1 mẫu của mình có API rõ ràng để theo dõi kết quả ok hơn :v.
+</p>
+<h2>Sample 2 — Custom Mèo</h2>
+<p>
+    Mẫu thứ 2 là malware nội bộ mình tự dev. Với obfus command như sau:
+</p>
+<pre><code>
+clang-cl.exe /LD dllmain.cpp 
+-mllvm -fla 
+-mllvm -bcf 
+-mllvm -bcf_prob=100 
+-mllvm -bcf_loop=2 
+-mllvm -sub
+</code></pre>
+<p>
+    Đến với cách tiếp cận mẫu thứ 2 này, vẫn bám theo format cũ thôi. Trước tiên vẫn là tìm dispatcher block bằng block nhiều pred nhất:
+</p>
+<img class="image-container" src="25.jpg" alt="CFF25">
+<img class="image-container" src="26.jpg" alt="CFF26">
+<p>
+    Well, nhưng ta có thể thấy ở đây dispatcher không sử dụng register nữa, mà dùng memory để lưu các giá trị switch flow. 
+</p>
+<p>
+    Thế nhưng sự khác biệt là không đáng bao nhiêu cả, bản chất của block trên vẫn là mov imm32 vào dispatcher, sau đó dùng zero flag để switch flow (sub, jz == cmp, jz). Patch tương tự như cũ, chỉ khác pattern đi 1 chút:
+</p>
+<img class="image-container" src="27.jpg" alt="CFF27">
+<p>
+    Mẫu này tương tự sử dụng các obfus đơn giản bằng MOV Dispatch mem, Imm32 sau đó JMP hoặc không, mình sẽ không đi chi tiết vào nữa:
+</p>
+<img class="image-container" src="28.jpg" alt="CFF28">
+<img class="image-container" src="29.jpg" alt="CFF29">
+<p>
+    Mẫu cũng sử dụng CMOVNZ vào obfus. Tuy nhiên, cách tiếp cận của nó rất khác mẫu trước, có 2 variant CMOVNZ, mình sẽ đi vào từng cái 1.
+</p>
+<h2>1. Variant Patterns.</h2>
+<h3>1.1. CMOVNZ with Global variable.</h3>
+<p>
+    Pattern này gặp khá nhiều trong xuyên suốt luồng chương trình:
+</p>
+<img class="image-container" src="30.jpg" alt="CFF30">
+<p>
+    Các local variable này đc init runtime:
+</p>
+<img class="image-container" src="31.jpg" alt="CFF31">
+<p>Vậy nên làm sao để biết dl trả về bao nhiêu mà make flow?</p>
+<p>Tại đây, mình dùng unicorn emulate lại bắt đầu mov reg32, global var đầu tiên tới lệnh test dl, 1:</p>
+<img class="image-container" src="32.jpg" alt="CFF32">
+<p>
+    Có vẻ chỉ là obfus tính toán linh tinh, và bất kể 2 global variable kia bằng bao nhiêu, dl luôn luôn trả về <code>True</code>. Từ đây, ta có thể xử lý variant này bằng cách patch JMP thẳng đến IMM32 của ecx luôn :D, tương đối dễ.
+</p>
+<h3>1.2. CMOVNZ with out Global variable.</h3>
+<p>
+    Những pattern này thì không có Global variable ở đầu:
+</p>
+<img class="image-container" src="33.jpg" alt="CFF33">
+<p>
+    Local var được mov vào dl này lại là giá trị được xử lý theo những đoạn code “có nghĩa”:
+</p>
+<img class="image-container" src="34.jpg" alt="CFF34">
+<p>
+    Đâm ra khá là khó để emu mà biết được dl là bao nhiêu. Khi này mình nảy ra ý tưởng là sao không kệ luôn nhỉ, patch thành condition jump dựa theo 2 imm32 đích là được :D.
+</p>
+<p>
+    Well, và kết quả sau khi patch thì cực kì đẹp. From this:
+</p>
+<img class="image-container" src="35.jpg" alt="CFF35">
+<p>To this:</p>
+<img class="image-container" src="36.jpg" alt="CFF36">
+
+<p>Tất cả những hàm bị CFF trong mẫu này, mình đều có thể recover gần như nguyên bản hết:</p>
+<img class="image-container" src="37.jpg" alt="CFF37">
+<img class="image-container" src="38.jpg" alt="CFF38">
+<img class="image-container" src="39.jpg" alt="CFF39">
+
+
+<h2>Summary.</h2>
+
+<p>Như vậy là ta vừa đi qua 2 mẫu CFFed và hướng để deob. Tóm gọn lại, khi deob CFF, mình luôn chú trọng đến tìm được 3 thứ mấu chốt như sau:</p>
+
+<ul>
+<li>Tìm CFF Dispatcher(s).</li>
+<li>Tìm Destination đối với từng IMM.</li>
+<li>Tìm và xử lý các Variant pattern.</li>
+</ul>
+
+<p>
+Từ những dữ kiện đó, ta hoàn toàn có thể nối chúng về flow gốc tương đối ok.
+</p>
+
+<p>
+    -> Đây là toàn bộ chia sẻ về kinh nghiệm trong suốt quá trình tìm hiểu, nghiên cứu deob CFF của mình. Có thể mình chưa gặp nhiều các variant và các kiểu CFF khó hơn khác, nên nếu có gì thiếu hoặc sai sót, mong được đóng góp qua tin nhắn :3. Cảm ơn đã đọc!
+</p>
+
+<h2>Script</h2>
+<a href="scripts\CFF1.py" style="color:pink;">PlugX deobfuscate script</a>
+<br>
+<a href="scripts\CFF2.py" style="color:pink;">Custom mlaware deobfuscate script</a>
+
+<h2>Sample</h2>
+<a href="samples\plugx\password-[infected].zip" style="color:pink;">PlugX sample</a>
+<br>
+<a href="samples\custom\password-[infected].zip" style="color:pink;">Custom sample</a>
+
+
+</main>
+</body>
+</html>

@@ -1,10 +1,11 @@
 function Title() {
   const wrapper = document.createElement("div");
 
-  wrapper.style.position = "absolute";
+  wrapper.style.position = "fixed";
   wrapper.style.display = "flex";
   wrapper.style.justifyContent = "center";
   wrapper.style.width = "100%";
+
 
   const pre = document.createElement("pre");
 
@@ -17,11 +18,11 @@ function Title() {
   pre.style.background = "linear-gradient(to right, #00e1ff, #ff62d0)";
   pre.style.backgroundClip = "text";
   pre.style.color = "transparent";
-  pre.style.fontSize = "40px";
+  pre.style.fontSize = "42px";
 
   pre.textContent = `
-ベクスターミナル
-      `;
+  ベクスターミナル
+  `;
 
   wrapper.appendChild(pre);
 

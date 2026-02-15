@@ -5,51 +5,51 @@ function Commands() {
   const commands = {
     help: "whoami blogs clear",
 
-    blogs: createLink(
-      "https://github.com/NVex0/uWU"
+    blogs: createLink("blog_asset/blog_1/blog.html", "Feb-15-2026:\u2009Nghịch\u2009ngợm\u2009deobfuscate\u2009CFF"
     ),
 
     whoami: createLink(
-      "https://github.com/NVex0"
+      "https://github.com/NVex0", "NVex0"
     ),
 
     // ls: createLS()
   };
 
-  function createLink(url) {
+  function createLink(url, label) {
     const a = document.createElement("a");
     a.href = url;
-    a.textContent = url;
+    a.textContent = label;
     a.className = "hover-link";
     a.target = "_blank";
     return a;
   }
 
-  function createLS() {
-    const span = document.createElement("span");
 
-    span.appendChild(createLink(""));
-    span.append(" { ");
+  // function createLS() {
+  //   const span = document.createElement("span");
 
-    span.appendChild(createLink(""));
-    span.append(" ");
+  //   span.appendChild(createLink(""));
+  //   span.append(" { ");
 
-    span.appendChild(createLink(""));
-    span.append(" ");
+  //   span.appendChild(createLink(""));
+  //   span.append(" ");
 
-    span.appendChild(createLink(""));
-    span.append(" ");
+  //   span.appendChild(createLink(""));
+  //   span.append(" ");
 
-    span.appendChild(createLink(""));
-    span.append(" ");
+  //   span.appendChild(createLink(""));
+  //   span.append(" ");
 
-    span.appendChild(createLink(""));
-    span.append(" ");
+  //   span.appendChild(createLink(""));
+  //   span.append(" ");
 
-    span.appendChild(createLink(""));
+  //   span.appendChild(createLink(""));
+  //   span.append(" ");
 
-    return span;
-  }
+  //   span.appendChild(createLink(""));
+
+  //   return span;
+  // }
 
   function updateConsoleOutput(newItem) {
     consoleOutput = consoleOutput.concat(newItem);

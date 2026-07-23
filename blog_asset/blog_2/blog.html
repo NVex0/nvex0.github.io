@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<link rel="icon" href="../../favicon.png" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>UAC Bypass với CMSTP, FAR AND BEYOND</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    background:black;
+    color:white;
+    font-family: 'Calibri','Calibri Body',sans-serif;
+    line-height:1.6;
+}
+
+/* TITLE */
+
+.title-wrapper{
+    width:100%;
+    display:flex;
+    justify-content:center;
+    z-index:1000;
+}
+
+.title{
+    font-size:42px;
+    font-weight:bold;
+    padding-top:50px;
+    text-align:center;
+
+    background:linear-gradient(to right,#00e1ff,#ff62d0);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+}
+
+/* CONTENT */
+
+main{
+    max-width:900px;
+    margin:auto;
+    padding:110px 20px 60px;
+}
+
+h1,h2,h3{
+    margin-top:40px;
+    margin-bottom:10px;
+}
+
+p{
+    margin-bottom:18px;
+    opacity:0.9;
+}
+
+video{
+    width:100%;
+    border-radius:12px;
+    margin-bottom:24px;
+    display:block;
+    background:#0b0b0b;
+}
+
+ul{
+    margin-left:20px;
+    margin-bottom:18px;
+}
+
+code{
+    background:#111;
+    padding:2px 6px;
+    border-radius:4px;
+    color:#00e1ff;
+}
+
+pre{
+    background:#0b0b0b;
+    padding:16px;
+    border-radius:8px;
+    overflow:auto;
+    margin-bottom:24px;
+}
+
+/* IMAGE */
+
+.hero-img{
+    width:100%;
+    height:400px;
+    object-fit:cover;
+    border-radius:12px;
+    margin-bottom:40px;
+}
+
+.image-container{
+    width:100%;
+    margin-bottom:8px;
+}
+
+.image-container img{
+    width:100%;
+    height:400px;
+    object-fit:cover;
+    border-radius:12px;
+    display:block;
+}
+
+.img-caption{
+    text-align:center;
+    font-style:italic;
+    opacity:0.75;
+    margin-top:0;
+    margin-bottom:24px;
+    font-size:0.95em;
+}
+
+a{
+    color:pink;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="title-wrapper">
+<pre class="title" style="font-family:'Calibri','Calibri Body',sans-serif;">UAC Bypass với CMSTP, ABOVE AND BEYOND</pre>
+</div>
+
+<main>
+
+<p>
+    Hôm nay mình sẽ giới thiệu 1 kĩ thuật tuy cũ nhưng vẫn sử dụng hiệu quả cho đến hiện tại – UAC bypass sử dụng CMSTP. Và trong bài viết này sẽ là use case của mình là elevated malware bypass Windows Defender.
+</p>
+
+<h2>CMSTP LÀ GÌ?</h2>
+
+<p>
+    CMSTP, thường được gọi là Connection Manager Profile Installer, là một tiện ích hệ thống của Windows, thường nằm tại <code>%SystemRoot%\[System32/SysWOW64]\cmstp.exe</code>, dùng để cài đặt hoặc gỡ bỏ các Connection Manager service profile.
+</p>
+<p>
+    CMSTP thường bị lợi dụng rất nhiều trong UAC Bypass, bởi cơ chế của chính nó. Đầu vào chính của CMSTP là một file INF mô tả cách cài profile kết nối từ xa:
+</p>
+
+<pre><code>cmstp.exe profile.inf</code></pre>
+
+<p>
+    Tuy nhiên, CMSTP không chỉ “đọc dữ liệu cấu hình”.
+</p>
+<p>
+    Điểm quan trọng là INF mà CMSTP xử lý không chỉ chứa các giá trị thụ động, nó còn có thể chứa các directive mang yếu tố hành động – hay còn gọi là advanced INF:
+</p>
+<img class="image-container" src="1.png" alt="Advanced INF">
+<p class="img-caption">Hình 1. Advanced INF</p>
+<p>
+    Đây chính là nền tảng khiến CMSTP bị lợi dụng: 1 binary hợp lệ của Microsoft nhưng lại có khả năng thực thi các hành động do file INF bên ngoài điều khiển.
+</p>
+
+<h2>SIMPLE DEMO</h2>
+
+<p>
+    Search đại google cũng ra rất nhiều snippet demo lại kỹ thuật này rồi, đây là format script được sử dụng để demo nhiều nhất:
+</p>
+<img class="image-container" src="2.png" alt="CMSTP INF demo script">
+<p class="img-caption">Hình 2. CMSTP INF demo script</p>
+<p>
+    Mình có thể giải thích qua các Directive trên như sau:
+</p>
+<ul>
+<li><code>[version]</code>: Khai báo ban đầu bao gồm signature và type sẽ sử dụng là Advanced INF 2.5</li>
+<li><code>[DefaultInstall]</code>: Nó như là EntryPoint của file INF vậy, như ví dụ trên thì các define trong Directive này sẽ được thực hiện trước tiên.</li>
+<li><code>[RunPreSetupCommandsSection]</code>: Đây không phải 1 default directive, mà nó được define trong <code>[DefaultInstall] RunPreSetupCommands</code>, nói về RunPreSetupCommands thì giống như crtstartup trước khi chạy tới main vậy. Kiểu như “hãy chạy set lệnh này trước khi bắt đầu vào quá trình cài đặt chính”. Như trên ta có thể thấy trường này cho phép chạy lệnh <code>cmd.exe /c</code> và <code>taskkill</code>. Đây cũng là trường thực thi chính trong demo.</li>
+<li><code>[CustInstDestSectionAllUsers]</code>, <code>[AllUSer_LDIDSection]</code>: 2 trường này tham chiếu các số nguyên tới đường dẫn cài đặt inf. Tuy nhiên không thấy sử dụng các số tham chiếu này trong xuyên suốt file inf, nên ta bỏ nó đi cũng được :D</li>
+<li><code>[Strings]</code>: Directive này define 2 trường ServiceName và ShortSvcName, 2 trường này sẽ được sử dụng để đặt tên cho initialization file và interface name:</li>
+</ul>
+<img class="image-container" src="3.png" alt="Strings interface name">
+<p class="img-caption">Hình 3. Strings / interface name</p>
+<img class="image-container" src="4.png" alt="CMSTP IDA pseudocode">
+<p class="img-caption">Hình 4. Mã giả CMSTP trong IDA</p>
+<img class="image-container" src="5.png" alt="Profile trên máy">
+<p class="img-caption">Hình 5. Profile trên máy</p>
+<p>
+    Chạy thử demo để spawn cmd, ta thấy nó spawn ra cmd Admin:
+</p>
+<img class="image-container" src="6.png" alt="Demo spawn cmd admin 1">
+<p class="img-caption">Hình 6. Demo spawn cmd Admin</p>
+<img class="image-container" src="7.png" alt="Demo spawn cmd admin 2">
+<p class="img-caption">Hình 7. Demo spawn cmd Admin</p>
+
+<h2>CSMTP LEO QUYỀN NHƯ THẾ NÀO?</h2>
+
+<img class="image-container" src="8.png" alt="CSMTP elevation flow diagram">
+<p class="img-caption">Hình 8. Sơ đồ mô tả tóm tắt cách CSMTP có thể dẫn tới thực thi với quyền cao hơn</p>
+<p>
+    Trước tiên, CSMTP sẽ check người dùng hiện tại có thuộc group Administrator không:
+</p>
+<img class="image-container" src="9.png" alt="Administrator group check">
+<p class="img-caption">Hình 9. Check group Administrator</p>
+<p>
+    Nếu điều kiện này thỏa mãn, CSMTP sẽ thực hiện tạo Admin Interface với CLSID của CMSTPLUA:
+</p>
+<img class="image-container" src="10.png" alt="CMSTPLUA CLSID Admin Interface 1">
+<p class="img-caption">Hình 10. Tạo Admin Interface CMSTPLUA</p>
+<p>
+    Sau đó tiến hành convert CMSTPLUA sang moniker:
+</p>
+<img class="image-container" src="11.png" alt="CMSTPLUA CLSID Admin Interface 2">
+<p class="img-caption">Hình 11. CoGetObject convert moniker</p>
+<p>
+    Ngoài ra, vì DllSurrogate của CMSTPLUA là giá trị default, tức chính là dllhost:
+</p>
+<img class="image-container" src="12.png" alt="Convert CMSTPLUA to moniker">
+<p class="img-caption">Hình 12. Convert CMSTPLUA sang moniker</p>
+
+<p>
+    Vậy nên khi này 1 tiến trình dllhost đã được elevated sẽ được spawn dưới dạng COM Surrogate:
+</p>
+<img class="image-container" src="13.png" alt="dllhost COM Surrogate elevated">
+<p class="img-caption">Hình 13. dllhost elevated (COM Surrogate)</p>
+<p>
+    Đây chính là cơ chế COM Elevation Moniker của Windows.
+</p>
+<p>
+    COM Surrogate này đóng vai trò đại diện COM Server, từ đó khi bên COM Client thực hiện gọi method bất kì, thì method này sẽ được thực thi với token của Surrogate. Từ đó, theo sơ đồ trên, khi CMSTP thực hiện gọi Method LaunchInfSection từ ICMLuaUtil, Method này sẽ thực hiện chạy các command trong directive RunPreSetupCommands của file với quyền admin:
+</p>
+<img class="image-container" src="14.png" alt="LaunchInfSection ICMLuaUtil">
+<p class="img-caption">Hình 14. LaunchInfSection / ICMLuaUtil</p>
+
+<h2>WEAPONIZE</h2>
+
+<p>
+    Ok, vậy là đã đi qua chi tiết về giải thích cách thức hoạt động rồi. Vậy thì câu hỏi nghịch ngợm tiếp theo của mình là, 1 kỹ thuật từ 2021 vẫn hoạt động tốt ở 2026, có cách nào để sử dụng được các kỹ thuật này mà qua mặt được Windows Defender không?
+</p>
+<p>
+    Mình test thử với code demo trước. WinDef chặt ngay lập tức (quá cổ rồi, signature base cũng chặt được):
+</p>
+<img class="image-container" src="15.png" alt="Windows Defender blocks demo">
+<p class="img-caption">Hình 15. Windows Defender chặn demo</p>
+
+<h2>BYPASSED DEMO</h2>
+
+<p>
+    Khi này, mình sẽ áp thử thêm 1 số layer protect vào, trước tiên là Halo’s Gate với NtCreateUserProcess để thực hiện chạy CSMTP:
+</p>
+<img class="image-container" src="16.png" alt="Halo Gate NtCreateUserProcess 1">
+<p class="img-caption">Hình 16. Halo’s Gate / NtCreateUserProcess</p>
+<img class="image-container" src="17.png" alt="Halo Gate NtCreateUserProcess 2">
+<p class="img-caption">Hình 17. Halo’s Gate / NtCreateUserProcess</p>
+<p>
+    Tiếp theo là Restart App với việc lợi dụng Windows Error Reporting để restart lại chương trình chạy tham số khác, tham số ở đây sẽ là key giải mã reverseshell:
+</p>
+<img class="image-container" src="18.png" alt="Restart App WER reverse shell key 1">
+<p class="img-caption">Hình 18. Restart App qua WER</p>
+<img class="image-container" src="19.png" alt="Restart App WER reverse shell key 2">
+<p class="img-caption">Hình 19. RC4 giải mã reverseshell</p>
+<p>
+    Cuối cùng là vài kỹ thuật cơ bản như dùng VEH để đổi flow chương trình, hay Long Sleep để anti scan. Ngoài ra là mình cũng dùng tên file không phải default file windows đọc được nữa (.inf) để tránh bị chém.
+</p>
+<p>
+    Cuối cùng, ta có kết quả vượt hoàn toàn Windows Defender để leo admin như sau (Vì dùng Long Sleep + Restart App mà lười chưa optimize lại nên vid hơi dài, ae thông cảm :D):
+</p>
+<video controls preload="metadata">
+    <source src="2026-05-13_16-34-00.mp4" type="video/mp4">
+    Trình duyệt không hỗ trợ phát video.
+</video>
+
+<h2>REMAINING ISSUES</h2>
+
+<p>
+    Trước tiên phải nói về điểm yếu của kỹ thuật này:
+</p>
+<ul>
+<li>Thứ nhất là vì core của kỹ thuật phụ thuộc vào 1 file điều khiển ngoài disk, nên rất dễ bị scan và chém từ đầu hoặc sẽ để lại footprint.</li>
+<li>Thứ 2 là có vượt mặt người dùng được không dựa vào UAC Level trên máy người dùng. Ở mức Always notify, nó sẽ ngay lập tức popup notification đến người dùng, mà vì noti này nằm ở SecureDesktop nên ta không thao tác bằng WinAPI để vô hình nó đi được:</li>
+</ul>
+<img class="image-container" src="20.png" alt="UAC Always notify SecureDesktop">
+<p class="img-caption">Hình 20. UAC Always notify (SecureDesktop)</p>
+<ul>
+<li>Cuối cùng, vì kỹ thuật này là lợi dụng LolBins nên hơi khó để kiểm soát được nên evade AV ở bước nào. Chẳng hạn như mình đã thử test trên Kaspersky Plus, mọi bước từ static scan đến chạy chương trình ban đầu đều rất ok, cho đến khi WER restart lại và bắt đầu deploy ra dllhost COM ICMLuaUtil thì bị chém ngay lập tức ☹</li>
+</ul>
+<p>
+    Trên đây là bài nói về kỹ thuật bypass UAC qua CSMTP và cách mình weaponize nó. Mình cũng sẽ update để nó có thể vượt qua các AV khác, hẹn gặp lại ở phần 2 :).
+</p>
+
+</main>
+</body>
+</html>

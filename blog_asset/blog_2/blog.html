@@ -282,7 +282,7 @@ a{
 <li>Thứ 2 là có vượt mặt người dùng được không dựa vào UAC Level trên máy người dùng. Ở mức Always notify, nó sẽ ngay lập tức popup notification đến người dùng, mà vì noti này nằm ở SecureDesktop nên ta không thao tác bằng WinAPI để vô hình nó đi được:</li>
 </ul>
 <img class="image-container" src="20.png" alt="UAC Always notify SecureDesktop">
-<p class="img-caption">Hình 20. UAC Always notify (SecureDesktop)</p>
+<p class="img-caption">Hình 20. UAC Level</p>
 <ul>
 <li>Cuối cùng, vì kỹ thuật này là lợi dụng LolBins nên hơi khó để kiểm soát được nên evade AV ở bước nào. Chẳng hạn như mình đã thử test trên Kaspersky Plus, mọi bước từ static scan đến chạy chương trình ban đầu đều rất ok, cho đến khi WER restart lại và bắt đầu deploy ra dllhost COM ICMLuaUtil thì bị chém ngay lập tức ☹</li>
 </ul>

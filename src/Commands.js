@@ -5,14 +5,11 @@ function Commands() {
   const commands = {
     help: "whoami blogs clear",
 
-    blogs: createLink("blog_asset/blog_1/blog.html", "Feb-15-2026:\u2009Nghịch\u2009ngợm\u2009deobfuscate\u2009CFF"
-    ),
+    blogs: createBlogsList(),
 
     whoami: createLink(
       "https://github.com/NVex0", "NVex0"
     ),
-
-    // ls: createLS()
   };
 
   function createLink(url, label) {
@@ -24,32 +21,21 @@ function Commands() {
     return a;
   }
 
+  function createBlogsList() {
+    const span = document.createElement("span");
 
-  // function createLS() {
-  //   const span = document.createElement("span");
+    span.appendChild(createLink(
+      "blog_asset/blog_1/blog.html",
+      "Feb-15-2026:\u2009Nghịch\u2009ngợm\u2009deobfuscate\u2009CFF"
+    ));
+    span.appendChild(document.createElement("br"));
+    span.appendChild(createLink(
+      "blog_asset/blog_2/blog.html",
+      "Jul-24-2026:\u2009UAC\u2009Bypass\u2009với\u2009CMSTP,\u2009FAR\u2009AND\u2009BEYOND"
+    ));
 
-  //   span.appendChild(createLink(""));
-  //   span.append(" { ");
-
-  //   span.appendChild(createLink(""));
-  //   span.append(" ");
-
-  //   span.appendChild(createLink(""));
-  //   span.append(" ");
-
-  //   span.appendChild(createLink(""));
-  //   span.append(" ");
-
-  //   span.appendChild(createLink(""));
-  //   span.append(" ");
-
-  //   span.appendChild(createLink(""));
-  //   span.append(" ");
-
-  //   span.appendChild(createLink(""));
-
-  //   return span;
-  // }
+    return span;
+  }
 
   function updateConsoleOutput(newItem) {
     consoleOutput = consoleOutput.concat(newItem);

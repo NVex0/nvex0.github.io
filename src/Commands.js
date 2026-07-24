@@ -31,7 +31,7 @@ function Commands() {
     span.appendChild(document.createElement("br"));
     span.appendChild(createLink(
       "blog_asset/blog_2/blog.html",
-      "Jul-24-2026:\u2009UAC\u2009Bypass\u2009với\u2009CMSTP,\u2009FAR\u2009AND\u2009BEYOND"
+      "Jul-24-2026:\u2009UAC\u2009Bypass\u2009với\u2009CMSTP,\u2009ABOVE\u2009AND\u2009BEYOND"
     ));
 
     return span;
